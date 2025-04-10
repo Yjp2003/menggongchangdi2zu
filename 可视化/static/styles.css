@@ -1,0 +1,67 @@
+body {
+    background: #f8f9fa;
+    color: #495057;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+}
+
+.upload-card {
+    border-radius: 15px;
+    overflow: hidden;
+}
+
+.upload-section {
+    padding: 1.5rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.upload-section:last-child {
+    border-bottom: none;
+}
+
+.preview-thumbnail {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.result-card {
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+@media (max-width: 768px) {
+    .preview-thumbnail {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .filename {
+        max-width: 100px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}
+
+.btn {
+    transition: all 0.2s ease;
+}
+
+.badge {
+    transition: opacity 0.2s ease;
+}
+
+.list-group-item {
+    transition: background-color 0.2s ease;
+}

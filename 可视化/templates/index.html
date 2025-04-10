@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能图像分类系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .tab-content section {
+            display: none;
+            padding: 20px;
+        }
+        .tab-content section.active {
+            display: block;
+        }
+        #cameraFeed {
+            width: 100%;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .nav-tabs .nav-link {
+            font-size: 1.1rem;
+            padding: 15px 30px;
+        }
+        .preview-img {
+            height: auto;
+            max-height: 200px;
+            object-fit: contain;
+        }
+        .card {
+            transition: transform 0.3s ease;
+        }
+        .card:hover {
+            transform: scale(1.05);
+        }
+        #loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+    <!-- 加载动画 -->
+    <div id="loading">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p>正在处理，请稍候...</p>
+    </div>
+
+    <div class="container py-5">
+        <ul class="nav nav-tabs">
+            <li class="nav-item">
+                <a class="nav-link active" data-tab="fileTab">文件上传</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-tab="cameraTab">实时识别</a>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            <!-- 文件上传模块 -->
+            <section id="fileTab" class="active">
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h4 class="mb-4">📁 文件上传</h4>
+                        <form id="fileForm" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <label class="form-label">上传 ZIP 文件</label>
+                                <input type="file" class="form-control" name="zip_file" accept=".zip">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">或上传多个图片文件</label>
+                                <input type="file" class="form-control" name="files" multiple accept="image/*">
+                            </div>
+                            <button type="button" class="btn btn-primary w-100" onclick="uploadFiles()">
+                                开始上传
+                            </button>
+                            <button type="button" class="btn btn-secondary w-100 mt-2" onclick="resetSession()">
+                                重置会话
+                            </button>
+                        </form>
+                        <div id="results" class="row mt-4"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 实时识别模块 -->
+            <section id="cameraTab">
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h4 class="mb-4">🎥 实时识别</h4>
+                        <img id="cameraFeed" src="">
+                        <div class="text-center">
+                            <button id="startBtn" class="btn btn-success btn-lg">
+                                启动摄像头
+                            </button>
+                            <button id="stopBtn" class="btn btn-danger btn-lg" disabled>
+                                停止识别
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        // 标签切换
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const tabId = this.dataset.tab;
+
+                document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+                this.classList.add('active');
+
+                document.querySelectorAll('.tab-content section').forEach(section => {
+                    section.classList.remove('active');
+                });
+                document.getElementById(tabId).classList.add('active');
+
+                if (tabId !== 'cameraTab' && window.isStreaming) {
+                    stopCamera();
+                }
+            });
+        });
+
+        // 摄像头控制
+        let isStreaming = false;
+        const cameraFeed = document.getElementById('cameraFeed');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+
+        function startCamera() {
+            if (!isStreaming) {
+                cameraFeed.src = '/video_feed';
+                isStreaming = true;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+            }
+        }
+
+        function stopCamera() {
+            if (isStreaming) {
+                fetch('/stop_camera')
+                    .then(() => {
+                        cameraFeed.src = '';
+                        isStreaming = false;
+                        startBtn.disabled = false;
+                        stopBtn.disabled = true;
+                    });
+            }
+        }
+
+        startBtn.addEventListener('click', startCamera);
+        stopBtn.addEventListener('click', stopCamera);
+
+        // 文件上传
+        function uploadFiles() {
+            const loading = document.getElementById('loading');
+            loading.style.display = 'flex'; // 显示加载动画
+
+            const formData = new FormData(document.getElementById('fileForm'));
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert(`上传成功！共处理了 ${data.results.length} 张图片。`);
+                    showResults(data.results, data.session_id);
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => console.error('Error:', error))
+            .finally(() => {
+                loading.style.display = 'none'; // 隐藏加载动画
+            });
+        }
+
+        // 显示结果
+        function showResults(results, sessionId) {
+            const container = document.getElementById('results');
+            container.innerHTML = results.map(item => `
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100">
+                        <img src="${item.preview_url}" class="card-img-top preview-img">
+                        <div class="card-body">
+                            <h5 class="card-title">${item.filename}</h5>
+                            <p class="card-text text-muted">
+                                分类：<a href="${item.preview_url.split('/').slice(0, -1).join('/')}" target="_blank">${item.predictions[0].class}</a>
+                            </p> <!-- 显示分类信息和链接 -->
+                            ${item.error ? `
+                                <div class="alert alert-danger">${item.error}</div>
+                            ` : `
+                                <ul class="list-group">
+                                    ${item.predictions.map(p => `
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            ${p.class}
+                                            <span class="badge bg-primary">${p.confidence}</span>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 重置会话
+        function resetSession() {
+            // 清空结果展示区域
+            document.getElementById('results').innerHTML = '';
+
+            // 清空文件上传表单的内容
+            const fileForm = document.getElementById('fileForm');
+            fileForm.reset(); // 重置表单，清空所有输入内容
+
+            alert('会话已重置');
+        }
+    </script>
+</body>
+</html>
